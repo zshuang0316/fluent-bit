@@ -2142,6 +2142,7 @@ int flb_input_upstream_set(struct flb_upstream *u, struct flb_input_instance *in
         }
 
         flb_free(u->proxied_host);
+        u->proxied_host = NULL;
         port = u->proxied_port;
     }
     else {
@@ -2153,6 +2154,7 @@ int flb_input_upstream_set(struct flb_upstream *u, struct flb_input_instance *in
         }
 
         flb_free(u->tcp_host);
+        u->tcp_host = NULL;
         port = u->tcp_port;
     }
 
