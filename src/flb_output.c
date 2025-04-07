@@ -1472,7 +1472,7 @@ int flb_output_upstream_set(struct flb_upstream *u, struct flb_output_instance *
 {
     int flags = 0;
     int ret;
-    const char *host;
+    char *host;
     int port;
     char *proxy_protocol = NULL;
     char *proxy_host = NULL;
@@ -1540,11 +1540,13 @@ int flb_output_upstream_set(struct flb_upstream *u, struct flb_output_instance *
     if (u->proxied_host) {
         host = flb_strdup(u->proxied_host);
         flb_free(u->proxied_host);
+        u->proxied_host = NULL;
         port = u->proxied_port;
     }
     else {
         host = flb_strdup(u->tcp_host);
         flb_free(u->tcp_host);
+        u->tcp_host = NULL;
         port = u->tcp_port;
     }
 
