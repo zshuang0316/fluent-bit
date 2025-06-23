@@ -190,19 +190,24 @@ void test_json_payload_get_wrapped_value()
     msgpack_unpacked_destroy(&up);
 }
 
-#define OTEL_JSON_PATH            FLB_TESTS_DATA_PATH "/data/opentelemetry/input.json"
-#define EXPECTED_METADATA_PATH    FLB_TESTS_DATA_PATH "/data/opentelemetry/expected_metadata.json"
-#define EXPECTED_BODY_PATH        FLB_TESTS_DATA_PATH "/data/opentelemetry/expected_body.json"
-#define EXPECTED_LOG_PATH         FLB_TESTS_DATA_PATH "/data/opentelemetry/expected_log.json"
+#define OTEL_TEST_CASES_PATH      FLB_TESTS_DATA_PATH "/data/opentelemetry/test_cases.json"
 
 void test_fluentbit_otel_json()
 {
     int ret;
     int error_status = 0;
+    char *cases_json;
     char *input_json;
     char *expect_meta;
     char *expect_body;
     char *expect_log;
+    char *tmp_buf;
+    size_t tmp_size;
+    int type;
+    msgpack_unpacked result;
+    msgpack_object *root;
+    msgpack_object *case_obj;
+    msgpack_object *expected;
     char *meta_json;
     char *body_json;
     char *log_json;
@@ -219,17 +224,48 @@ void test_fluentbit_otel_json()
     ret = flb_log_event_encoder_init(&enc, FLB_LOG_EVENT_FORMAT_FLUENT_BIT_V2);
     TEST_CHECK(ret == FLB_EVENT_ENCODER_SUCCESS);
 
-    input_json = mk_file_to_buffer(OTEL_JSON_PATH);
+    cases_json = mk_file_to_buffer(OTEL_TEST_CASES_PATH);
+    TEST_CHECK(cases_json != NULL);
+
+    ret = flb_pack_json(cases_json, strlen(cases_json), &tmp_buf, &tmp_size, &type, NULL);
+    TEST_CHECK(ret == 0);
+
+    msgpack_unpacked_init(&result);
+    ret = msgpack_unpack_next(&result, tmp_buf, tmp_size, NULL);
+    TEST_CHECK(ret == MSGPACK_UNPACK_SUCCESS);
+
+    root = &result.data;
+    ret = flb_otel_utils_find_map_entry_by_key(&root->via.map, "fluentbit_otel_json", 0, FLB_TRUE);
+    TEST_CHECK(ret >= 0);
+    case_obj = &root->via.map.ptr[ret].val;
+
+    ret = flb_otel_utils_find_map_entry_by_key(&case_obj->via.map, "input", 0, FLB_TRUE);
+    TEST_CHECK(ret >= 0);
+    input_json = flb_msgpack_to_json_str(1024, &case_obj->via.map.ptr[ret].val);
     TEST_CHECK(input_json != NULL);
 
-    expect_meta = mk_file_to_buffer(EXPECTED_METADATA_PATH);
+    ret = flb_otel_utils_find_map_entry_by_key(&case_obj->via.map, "expected", 0, FLB_TRUE);
+    TEST_CHECK(ret >= 0);
+    expected = &case_obj->via.map.ptr[ret].val;
+
+    ret = flb_otel_utils_find_map_entry_by_key(&expected->via.map, "metadata", 0, FLB_TRUE);
+    TEST_CHECK(ret >= 0);
+    expect_meta = flb_msgpack_to_json_str(256, &expected->via.map.ptr[ret].val);
     TEST_CHECK(expect_meta != NULL);
 
-    expect_body = mk_file_to_buffer(EXPECTED_BODY_PATH);
+    ret = flb_otel_utils_find_map_entry_by_key(&expected->via.map, "body", 0, FLB_TRUE);
+    TEST_CHECK(ret >= 0);
+    expect_body = flb_msgpack_to_json_str(256, &expected->via.map.ptr[ret].val);
     TEST_CHECK(expect_body != NULL);
 
-    expect_log = mk_file_to_buffer(EXPECTED_LOG_PATH);
+    ret = flb_otel_utils_find_map_entry_by_key(&expected->via.map, "log", 0, FLB_TRUE);
+    TEST_CHECK(ret >= 0);
+    expect_log = flb_msgpack_to_json_str(256, &expected->via.map.ptr[ret].val);
     TEST_CHECK(expect_log != NULL);
+
+    msgpack_unpacked_destroy(&result);
+    flb_free(tmp_buf);
+    flb_free(cases_json);
 
     ret = flb_opentelemetry_logs_json_to_msgpack(&enc, input_json, strlen(input_json), &error_status);
     TEST_CHECK(ret == 0);
