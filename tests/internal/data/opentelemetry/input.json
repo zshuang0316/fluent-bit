@@ -1,0 +1,1 @@
+{"resourceLogs":[{"resource":{"attributes":[{"key":"my-resource-attribute","value":{"stringValue":"my-attribute"}}]},"scopeLogs":[{"scope":{"name":"my.library","version":"1.0.0","attributes":[{"key":"a-scope-attribute","value":{"stringValue":"my-scope-attribute"}}]},"logRecords":[{"timeUnixNano":"1660296023390371588","body":{"stringValue":"{\"message\":\"test\"}"}}]}]}]}
