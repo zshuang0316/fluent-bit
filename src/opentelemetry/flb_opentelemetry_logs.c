@@ -730,7 +730,7 @@ int flb_opentelemetry_logs_json_to_msgpack(struct flb_log_event_encoder *encoder
         root = result2.data;
         msgpack_object_print(stdout, root);
         printf("\n");
-    }exit(0);
+    }
 
     flb_log_event_encoder_destroy(&local_log_encoder);
 
