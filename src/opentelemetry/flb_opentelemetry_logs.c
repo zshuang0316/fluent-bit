@@ -168,6 +168,7 @@ static int process_json_payload_log_records_entry(
     flb_log_event_encoder_append_metadata_values(encoder,
                                                  FLB_LOG_EVENT_CSTRING_VALUE(FLB_OTEL_LOGS_METADATA_KEY));
 
+
     result = flb_log_event_encoder_begin_map(encoder, FLB_LOG_EVENT_METADATA);
 
     // flb_log_event_encoder_append_string(encoder,
@@ -225,7 +226,7 @@ static int process_json_payload_log_records_entry(
                                                         FLB_LOG_EVENT_MSGPACK_OBJECT_VALUE(span_id));
     }
 
-    // flb_log_event_encoder_commit_map(encoder, FLB_LOG_EVENT_METADATA);
+     flb_log_event_encoder_commit_map(encoder, FLB_LOG_EVENT_METADATA);
 
     flb_log_event_encoder_commit_map(encoder, FLB_LOG_EVENT_METADATA);
 
@@ -552,10 +553,11 @@ static int process_json_payload_resource_logs_entry (struct flb_log_event_encode
                                                         FLB_LOG_EVENT_MSGPACK_OBJECT_VALUE(scope_schema_url));
             }
 
+            /* close scope map */
             flb_log_event_encoder_commit_map(encoder, FLB_LOG_EVENT_BODY);
         }
 
-        flb_log_event_encoder_commit_map(encoder, FLB_LOG_EVENT_BODY);
+        //flb_log_event_encoder_commit_map(encoder, FLB_LOG_EVENT_BODY);
 
         flb_log_event_encoder_group_header_end(encoder);
 
