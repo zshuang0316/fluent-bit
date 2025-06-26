@@ -5,10 +5,7 @@
         {
           "resource": {
             "attributes": [
-              {
-                "key": "my-resource-attribute",
-                "value": {"stringValue": "my-attribute"}
-              }
+              {"key": "my-resource-attribute", "value": {"stringValue": "my-attribute"}}
             ]
           },
           "scopeLogs": [
@@ -17,10 +14,7 @@
                 "name": "my.library",
                 "version": "1.0.0",
                 "attributes": [
-                  {
-                    "key": "a-scope-attribute",
-                    "value": {"stringValue": "my-scope-attribute"}
-                  }
+                  {"key": "a-scope-attribute", "value": {"stringValue": "my-scope-attribute"}}
                 ]
               },
               "logRecords": [
@@ -35,23 +29,163 @@
       ]
     },
     "expected": {
-      "metadata": {
-        "schema": "otlp",
-        "resource_id": 0,
-        "scope_id": 0
-      },
+      "metadata": {"schema": "otlp", "resource_id": 0, "scope_id": 0},
       "body": {
-        "resource": {
-          "attributes": {"my-resource-attribute": "my-attribute"}
-        },
+        "resource": {"attributes": {"my-resource-attribute": "my-attribute"}},
         "scope": {
           "name": "my.library",
           "version": "1.0.0",
           "attributes": {"a-scope-attribute": "my-scope-attribute"}
         }
       },
-      "log": {
-        "log": "{\"message\":\"test\"}"
+      "log": {"log": "{\"message\":\"test\"}"}
+    }
+  },
+
+  "unexpected_root_object_type": {
+    "input": [],
+    "expected_error": {
+      "code": "FLB_OTEL_LOGS_ERR_UNEXPECTED_ROOT_OBJECT_TYPE",
+    }
+  },
+
+  "missing_resourceLogs": {
+    "input": {},
+    "expected_error": {
+      "code": "FLB_OTEL_LOGS_ERR_RESOURCELOGS_MISSING",
+      "message": "resourceLogs missing"
+    }
+  },
+
+  "resourceLogs_wrong_type": {
+    "input": {"resourceLogs": {}},
+    "expected_error": {
+      "code": "FLB_OTEL_LOGS_ERR_UNEXPECTED_RESOURCELOGS_TYPE",
+    }
+  },
+
+  "resourceLogs_entry_wrong_type": {
+    "input": {"resourceLogs": ["bad"]},
+    "expected_error": {
+      "code": "FLB_OTEL_LOGS_ERR_UNEXPECTED_RESOURCELOGS_ENTRY_TYPE",
+    }
+  },
+
+  "scopeLogs_missing": {
+    "input": {"resourceLogs": [{}]},
+    "expected_error": {
+      "code":"FLB_OTEL_LOGS_ERR_SCOPELOGS_MISSING",
+      },
+      "log": null
+  },
+
+  "scopeLogs_wrong_type": {
+    "input": {"resourceLogs": [{"scopeLogs": {}}]},
+    "expected_error": {
+      "code": "FLB_OTEL_LOGS_ERR_UNEXPECTED_SCOPELOGS_TYPE",
+    }
+  },
+
+  "empty_logrecords_allowed": {
+    "input": {"resourceLogs": [{"scopeLogs": [{}]}]},
+    "expected": {
+      "empty_payload": true
+    }
+  },
+
+  "logRecords_wrong_type": {
+    "input": {"resourceLogs": [{"scopeLogs": [{"logRecords": {}}]}]},
+    "expected_error": {
+      "code": "FLB_OTEL_LOGS_ERR_UNEXPECTED_LOGRECORDS_TYPE",
+    }
+  },
+
+  "logRecords_entry_wrong_type": {
+    "input": {"resourceLogs": [{"scopeLogs": [{"logRecords": [1]}]}]},
+    "expected_error": {
+      "code": "FLB_OTEL_LOGS_ERR_UNEXPECTED_LOGRECORDS_ENTRY_TYPE",
+    }
+  },
+
+  "missing_timestamp": {
+    "input": {"resourceLogs": [{"scopeLogs": [{"logRecords": [{}]}]}]},
+    "expected_error": {
+      "code": "FLB_OTEL_LOGS_ERR_MISSING_TIMESTAMP",
+    }
+  },
+
+  "unexpected_timestamp_type": {
+    "input": {"resourceLogs": [{"scopeLogs": [{"logRecords": [{"timeUnixNano": {}}]}]}]},
+    "expected_error": {
+      "code": "FLB_OTEL_LOGS_ERR_UNEXPECTED_TIMESTAMP_TYPE",
+    }
+  },
+
+  "unexpected_attributes_type": {
+    "input": {
+      "resourceLogs": [{
+        "scopeLogs": [{
+          "logRecords": [{
+            "timeUnixNano": "1",
+            "attributes": {
+              "http.status_code": "500",
+              "retryable": true
+            },
+            "body": {"stringValue": "test"}
+          }]
+        }]
+      }]
+    },
+    "expected": {
+      "metadata": {"schema": "otlp", "resource_id": 0, "scope_id": 0},
+      "body": {
+        "resource": {},
+        "scope": {},
+        "attributes": {
+          "http.status_code": "500",
+          "retryable": true
+        }
+      },
+      "log": {"log": "test"}
+    }
+  },
+
+  "unexpected_body_type": {
+    "input": {
+      "resourceLogs": [{
+        "scopeLogs": [{
+          "logRecords": [{
+            "timeUnixNano": "1",
+            "body": []
+          }]
+        }]
+      }]
+    },
+    "expected_error": {
+      "code": "FLB_OTEL_LOGS_ERR_UNEXPECTED_BODY_TYPE",
+    }
+  },
+
+  "scope_kvlist_error": {
+    "input": {
+      "resourceLogs": [{
+        "scopeLogs": [{
+          "scope": {
+            "attributes": [{"key": "only-key"}]
+          },
+          "logRecords": [{
+            "timeUnixNano": "1",
+            "body": {"stringValue": "test"}
+          }]
+        }]
+      }]
+    },
+    "expected": {
+      "metadata": {"schema": "otlp", "resource_id": 0, "scope_id": 0},
+      "body": {
+        "resource": {},
+        "scope": {},
+        "log": {"log": "test"}
       }
     }
   }
