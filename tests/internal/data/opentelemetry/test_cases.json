@@ -136,17 +136,8 @@
         }]
       }]
     },
-    "expected": {
-      "metadata": {"schema": "otlp", "resource_id": 0, "scope_id": 0},
-      "body": {
-        "resource": {},
-        "scope": {},
-        "attributes": {
-          "http.status_code": "500",
-          "retryable": true
-        }
-      },
-      "log": {"log": "test"}
+    "expected_error": {
+      "code": "FLB_OTEL_LOGS_ERR_UNEXPECTED_ATTRIBUTES_TYPE",
     }
   },
 
@@ -180,13 +171,8 @@
         }]
       }]
     },
-    "expected": {
-      "metadata": {"schema": "otlp", "resource_id": 0, "scope_id": 0},
-      "body": {
-        "resource": {},
-        "scope": {},
-        "log": {"log": "test"}
-      }
+    "expected_error": {
+      "code": "FLB_OTEL_LOGS_ERR_SCOPE_KVLIST"
     }
   }
 }

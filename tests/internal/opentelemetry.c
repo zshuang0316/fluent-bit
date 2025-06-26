@@ -42,6 +42,10 @@ static char *get_group_metadata(void *chunk, size_t size)
     int ret;
     char *json;
 
+    if (size <= 0) {
+        return NULL;
+    }
+
     ret = flb_log_event_decoder_init(&dec, chunk, size);
     TEST_CHECK(ret == FLB_EVENT_DECODER_SUCCESS);
 
@@ -55,7 +59,7 @@ static char *get_group_metadata(void *chunk, size_t size)
     }
 
     json = flb_msgpack_to_json_str(1024, event.metadata);
-    printf("json -> %s\n", json);exit(0);
+    printf("json -> %s\n", json);
     flb_log_event_decoder_destroy(&dec);
     return json;
 }
@@ -66,6 +70,10 @@ static char *get_group_body(void *chunk, size_t size)
     struct flb_log_event event;
     int ret;
     char *json;
+
+    if (size <= 0) {
+        return NULL;
+    }
 
     ret = flb_log_event_decoder_init(&dec, chunk, size);
     TEST_CHECK(ret == FLB_EVENT_DECODER_SUCCESS);
@@ -89,6 +97,10 @@ static char *get_log_body(void *chunk, size_t size)
     struct flb_log_event event;
     int ret;
     char *json;
+
+    if (size <= 0) {
+        return NULL;
+    }
 
     ret = flb_log_event_decoder_init(&dec, chunk, size);
     TEST_CHECK(ret == FLB_EVENT_DECODER_SUCCESS);
@@ -238,22 +250,23 @@ void test_opentelemetry_cases()
         struct flb_log_event_encoder enc;
         msgpack_object *expected;
         msgpack_object *exp_err;
-        char *meta_json;
-        char *body_json;
-        char *log_json;
-        char *expect_meta;
-        char *expect_body;
-        char *expect_log;
-        char *case_name;
+        char *meta_json = NULL;
+        char *body_json = NULL;
+        char *log_json = NULL;
+        char *expect_meta = NULL;
+        char *expect_body = NULL;
+        char *expect_log = NULL;
+        char *case_name = NULL;
 
         /* put the test name in a new buffer to avoid referencing msgpack object directly */
         case_name = flb_malloc(root->via.map.ptr[i].key.via.str.size + 1);
         if (!case_name) {
-            flb_error("could not allocate memory for case name");
+            flb_errno();
             flb_free(cases_json);
             msgpack_unpacked_destroy(&result);
             return;
         }
+
         memcpy(case_name, root->via.map.ptr[i].key.via.str.ptr, root->via.map.ptr[i].key.via.str.size);
         case_name[root->via.map.ptr[i].key.via.str.size] = '\0';
         printf(">> running test case '%s'\n", case_name);
@@ -374,7 +387,6 @@ void test_opentelemetry_cases()
 
             /* try to encode it */
             ret = flb_opentelemetry_logs_json_to_msgpack(&enc, input_json, strlen(input_json), &error_status);
-            printf("return status: %i, error_status: %i\n", ret, error_status);
             TEST_CHECK_(ret < 0, "test case '%s' should fail", case_name);
             TEST_CHECK_(error_status == exp_code,
                         "expected error code=%i, returned error_status=%i (%s)",
@@ -399,6 +411,7 @@ void test_opentelemetry_cases()
 
         flb_log_event_encoder_destroy(&enc);
         flb_free(input_json);
+        flb_free(case_name);
     }
 
     msgpack_unpacked_destroy(&result);
