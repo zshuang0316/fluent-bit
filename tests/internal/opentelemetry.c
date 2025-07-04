@@ -21,6 +21,7 @@
 #include <fluent-bit/flb_log_event_decoder.h>
 #include <fluent-bit/flb_pack.h>
 #include <fluent-bit/flb_sds.h>
+#include <fluent-bit/flb_mem.h>
 
 // #include "../../plugins/in_opentelemetry/opentelemetry.h"
 #include <fluent-bit/flb_opentelemetry.h>
@@ -86,6 +87,8 @@ static void free_test_output(struct test_output *output)
     if (output->groups) {
         flb_free(output->groups);
     }
+
+    flb_free(output);
 }
 
 static struct test_output *parse_test_output(void *chunk, size_t size)
@@ -98,6 +101,7 @@ static struct test_output *parse_test_output(void *chunk, size_t size)
     size_t group_idx = 0;
     size_t record_idx = 0;
     int in_group = 0;
+    size_t *record_counts = NULL;
 
     if (size <= 0) {
         return NULL;
@@ -118,34 +122,48 @@ static struct test_output *parse_test_output(void *chunk, size_t size)
         ret = flb_log_event_decoder_get_record_type(&event, &record_type);
         if (ret != 0) {
             flb_log_event_decoder_destroy(&dec);
+            flb_free(record_counts);
             free_test_output(output);
             return NULL;
         }
 
         if (record_type == FLB_LOG_EVENT_GROUP_START) {
+            size_t *tmp;
+
             output->group_count++;
-        }
-        else if (record_type == FLB_LOG_EVENT_NORMAL) {
-            if (output->group_count > 0) {
-                /* Find the current group and increment its record count */
-                size_t i;
-                for (i = 0; i < output->group_count; i++) {
-                    if (output->groups[i].record_count == 0) {
-                        output->groups[i].record_count++;
-                        break;
-                    }
-                }
+            tmp = flb_realloc(record_counts, sizeof(size_t) * output->group_count);
+            if (!tmp) {
+                flb_log_event_decoder_destroy(&dec);
+                flb_free(record_counts);
+                free_test_output(output);
+                return NULL;
             }
+            record_counts = tmp;
+            record_counts[output->group_count - 1] = 0;
+            in_group = 1;
+        }
+        else if (record_type == FLB_LOG_EVENT_NORMAL && in_group) {
+            record_counts[output->group_count - 1]++;
+        }
+        else if (record_type == FLB_LOG_EVENT_GROUP_END) {
+            in_group = 0;
         }
     }
 
     /* Allocate groups */
     if (output->group_count > 0) {
+        size_t i;
+
         output->groups = flb_calloc(output->group_count, sizeof(struct test_group));
         if (!output->groups) {
             flb_log_event_decoder_destroy(&dec);
+            flb_free(record_counts);
             free_test_output(output);
             return NULL;
+        }
+
+        for (i = 0; i < output->group_count; i++) {
+            output->groups[i].record_count = record_counts[i];
         }
     }
 
@@ -174,6 +192,12 @@ static struct test_output *parse_test_output(void *chunk, size_t size)
                 if (output->groups[group_idx].record_count > 0) {
                     output->groups[group_idx].records = flb_calloc(output->groups[group_idx].record_count,
                                                                   sizeof(struct test_record));
+                    if (!output->groups[group_idx].records) {
+                        flb_log_event_decoder_destroy(&dec);
+                        flb_free(record_counts);
+                        free_test_output(output);
+                        return NULL;
+                    }
                 }
                 record_idx = 0;
                 in_group = 1;
@@ -196,6 +220,7 @@ static struct test_output *parse_test_output(void *chunk, size_t size)
     }
 
     flb_log_event_decoder_destroy(&dec);
+    flb_free(record_counts);
     return output;
 }
 
@@ -500,6 +525,7 @@ void test_opentelemetry_cases()
         char *expect_group_body = NULL;
         char *expect_log_meta = NULL;
         char *expect_log_body = NULL;
+        int has_groups = FLB_FALSE;
         char *case_name = NULL;
 
         /* put the test name in a new buffer to avoid referencing msgpack object directly */
@@ -529,6 +555,7 @@ void test_opentelemetry_cases()
         ret = flb_otel_utils_find_map_entry_by_key(&case_obj->via.map, "expected", 0, FLB_TRUE);
         if (ret >= 0) {
             expected = &case_obj->via.map.ptr[ret].val;
+            has_groups = (flb_otel_utils_find_map_entry_by_key(&expected->via.map, "groups", 0, FLB_TRUE) >= 0);
 
             /* check if we do expect an ok but an empty response (no ingestion) */
             ret = flb_otel_utils_find_map_entry_by_key(&expected->via.map, "empty_payload", 0, FLB_TRUE);
@@ -549,7 +576,7 @@ void test_opentelemetry_cases()
                 empty_payload = FLB_FALSE;
             }
 
-            if (empty_payload == FLB_FALSE) {
+            if (empty_payload == FLB_FALSE && has_groups == FLB_FALSE) {
                 ret = flb_otel_utils_find_map_entry_by_key(&expected->via.map, "group_metadata", 0, FLB_TRUE);
                 TEST_CHECK(ret >= 0);
                 expect_group_meta = flb_msgpack_to_json_str(256, &expected->via.map.ptr[ret].val);
@@ -590,20 +617,27 @@ void test_opentelemetry_cases()
                         flb_free(expect_group_body);
                         flb_free(expect_log_meta);
                         flb_free(expect_log_body);
+                        flb_log_event_encoder_destroy(&enc);
+                        flb_free(input_json);
+                        flb_free(case_name);
                         continue;
                     }
                     free_test_output(actual_output);
                 }
+                if (has_groups == FLB_FALSE) {
+                    /* Fall back to legacy format validation */
+                    meta_json = get_group_metadata(enc.output_buffer, enc.output_length);
+                    TEST_CHECK(strcmp(meta_json, expect_group_meta) == 0);
 
-                /* Fall back to legacy format validation */
-                meta_json = get_group_metadata(enc.output_buffer, enc.output_length);
-                TEST_CHECK(strcmp(meta_json, expect_group_meta) == 0);
+                    body_json = get_group_body(enc.output_buffer, enc.output_length);
+                    TEST_CHECK(strcmp(body_json, expect_group_body) == 0);
 
-                body_json = get_group_body(enc.output_buffer, enc.output_length);
-                TEST_CHECK(strcmp(body_json, expect_group_body) == 0);
-
-                log_json = get_log_body(enc.output_buffer, enc.output_length);
-                TEST_CHECK(strcmp(log_json, expect_log_body) == 0);
+                    log_json = get_log_body(enc.output_buffer, enc.output_length);
+                    TEST_CHECK(strcmp(log_json, expect_log_body) == 0);
+                }
+                else {
+                    TEST_CHECK_(0, "extended format validation failed: %s", case_name);
+                }
             }
             else {
                 /* if we expect an empty payload, there should be no metadata, body or log */
