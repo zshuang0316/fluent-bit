@@ -741,5 +741,439 @@
         }
       ]
     }
+  },
+
+  "multiple_groups_second_group_fails": {
+    "input": {
+      "resourceLogs": [
+        {
+          "resource": {
+            "attributes": [
+              {"key": "service.name", "value": {"stringValue": "service-1"}}
+            ]
+          },
+          "scopeLogs": [{
+            "scope": {
+              "name": "scope-1",
+              "version": "1.0.0"
+            },
+            "logRecords": [
+              {
+                "timeUnixNano": "1640995200000000000",
+                "body": {"stringValue": "valid log from service-1"}
+              }
+            ]
+          }]
+        },
+        {
+          "resource": {
+            "attributes": [
+              {"key": "service.name", "value": {"stringValue": "service-2"}}
+            ]
+          },
+          "scopeLogs": [{
+            "scope": {
+              "attributes": "invalid_attributes_not_array"
+            },
+            "logRecords": [
+              {
+                "timeUnixNano": "1640995201000000000",
+                "body": {"stringValue": "this should not be processed"}
+              }
+            ]
+          }]
+        }
+      ]
+    },
+    "expected_error": {
+      "code": "FLB_OTEL_LOGS_ERR_SCOPE_KVLIST"
+    }
+  },
+
+  "multiple_records_middle_record_fails": {
+    "input": {
+      "resourceLogs": [{
+        "resource": {
+          "attributes": [
+            {"key": "service.name", "value": {"stringValue": "test-service"}}
+          ]
+        },
+        "scopeLogs": [{
+          "scope": {
+            "name": "test-scope",
+            "version": "1.0.0"
+          },
+          "logRecords": [
+            {
+              "timeUnixNano": "1640995200000000000",
+              "body": {"stringValue": "first valid log"}
+            },
+            {
+              "timeUnixNano": "1640995201000000000",
+              "body": {"stringValue": "second valid log"}
+            },
+            {
+              "timeUnixNano": "1640995202000000000",
+              "attributes": "invalid_attributes_not_array",
+              "body": {"stringValue": "this log has invalid attributes"}
+            },
+            {
+              "timeUnixNano": "1640995203000000000",
+              "body": {"stringValue": "fourth log that should not be reached"}
+            }
+          ]
+        }]
+      }]
+    },
+    "expected_error": {
+      "code": "FLB_OTEL_LOGS_ERR_UNEXPECTED_ATTRIBUTES_TYPE"
+    }
+  },
+
+  "complex_nested_structure_deep_failure": {
+    "input": {
+      "resourceLogs": [
+        {
+          "resource": {
+            "attributes": [
+              {"key": "service.name", "value": {"stringValue": "service-1"}},
+              {"key": "service.version", "value": {"stringValue": "1.0.0"}},
+              {"key": "deployment.environment", "value": {"stringValue": "production"}}
+            ],
+            "droppedAttributesCount": 0
+          },
+          "schemaUrl": "https://opentelemetry.io/schemas/1.9.0",
+          "scopeLogs": [
+            {
+              "scope": {
+                "name": "scope-1",
+                "version": "1.0.0",
+                "attributes": [
+                  {"key": "library.name", "value": {"stringValue": "test-lib"}}
+                ]
+              },
+              "schemaUrl": "https://opentelemetry.io/schemas/1.9.0",
+              "logRecords": [
+                {
+                  "timeUnixNano": "1640995200000000000",
+                  "severityNumber": 9,
+                  "severityText": "INFO",
+                  "attributes": [
+                    {"key": "http.method", "value": {"stringValue": "GET"}},
+                    {"key": "http.status_code", "value": {"intValue": 200}}
+                  ],
+                  "traceId": "5B8EFFF798038103D269B633813FC60C",
+                  "spanId": "EEE19B7EC3C1B174",
+                  "body": {"stringValue": "complex valid log"}
+                }
+              ]
+            },
+            {
+              "scope": {
+                "name": "scope-2",
+                "version": "2.0.0",
+                "attributes": [
+                  {"key": "library.name", "value": {"stringValue": "another-lib"}}
+                ]
+              },
+              "logRecords": [
+                {
+                  "timeUnixNano": "invalid_timestamp_type_object",
+                  "body": {"stringValue": "this log has invalid timestamp"}
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "expected_error": {
+      "code": "FLB_OTEL_LOGS_ERR_UNEXPECTED_TIMESTAMP_TYPE"
+    }
+  },
+
+  "multiple_scopes_second_scope_fails": {
+    "input": {
+      "resourceLogs": [{
+        "resource": {
+          "attributes": [
+            {"key": "service.name", "value": {"stringValue": "test-service"}},
+            {"key": "service.version", "value": {"stringValue": "1.0.0"}}
+          ],
+          "droppedAttributesCount": 0
+        },
+        "scopeLogs": [
+          {
+            "scope": {
+              "name": "valid-scope",
+              "version": "1.0.0",
+              "attributes": [
+                {"key": "scope.attr", "value": {"stringValue": "valid-value"}}
+              ]
+            },
+            "logRecords": [
+              {
+                "timeUnixNano": "1640995200000000000",
+                "body": {"stringValue": "valid log from first scope"}
+              },
+              {
+                "timeUnixNano": "1640995201000000000",
+                "body": {"stringValue": "another valid log from first scope"}
+              }
+            ]
+          },
+          {
+            "scope": {
+              "name": "invalid-scope",
+              "attributes": [
+                {"key": "incomplete-kv-pair"}
+              ]
+            },
+            "logRecords": [
+              {
+                "timeUnixNano": "1640995202000000000",
+                "body": {"stringValue": "this should not be processed"}
+              }
+            ]
+          }
+        ]
+      }]
+    },
+    "expected_error": {
+      "code": "FLB_OTEL_LOGS_ERR_SCOPE_KVLIST"
+    }
+  },
+
+  "resource_valid_scope_missing": {
+    "input": {
+      "resourceLogs": [{
+        "resource": {
+          "attributes": [
+            {"key": "service.name", "value": {"stringValue": "test-service"}},
+            {"key": "service.version", "value": {"stringValue": "1.0.0"}},
+            {"key": "deployment.environment", "value": {"stringValue": "staging"}}
+          ],
+          "droppedAttributesCount": 0
+        },
+        "schemaUrl": "https://opentelemetry.io/schemas/1.9.0"
+      }]
+    },
+    "expected_error": {
+      "code": "FLB_OTEL_LOGS_ERR_SCOPELOGS_MISSING"
+    }
+  },
+
+  "multiple_records_no_timestamp_after_valid_ones": {
+    "input": {
+      "resourceLogs": [{
+        "resource": {
+          "attributes": [
+            {"key": "service.name", "value": {"stringValue": "test-service"}}
+          ]
+        },
+        "scopeLogs": [{
+          "scope": {
+            "name": "test-scope"
+          },
+          "logRecords": [
+            {
+              "timeUnixNano": "1640995200000000000",
+              "severityNumber": 9,
+              "severityText": "INFO",
+              "attributes": [
+                {"key": "user.id", "value": {"stringValue": "user123"}},
+                {"key": "action", "value": {"stringValue": "login"}}
+              ],
+              "body": {"stringValue": "User login successful"}
+            },
+            {
+              "timeUnixNano": "1640995201000000000",
+              "severityNumber": 5,
+              "severityText": "DEBUG",
+              "body": {"stringValue": "Processing user session"}
+            },
+            {
+              "severityNumber": 13,
+              "severityText": "ERROR",
+              "body": {"stringValue": "This log is missing timestamp"}
+            }
+          ]
+        }]
+      }]
+    },
+    "expected_error": {
+      "code": "FLB_OTEL_LOGS_ERR_MISSING_TIMESTAMP"
+    }
+  },
+
+  "large_structure_fails_at_resource_attributes": {
+    "input": {
+      "resourceLogs": [
+        {
+          "resource": {
+            "attributes": "this_should_be_an_array_not_string",
+            "droppedAttributesCount": 0
+          },
+          "schemaUrl": "https://opentelemetry.io/schemas/1.9.0",
+          "scopeLogs": [
+            {
+              "scope": {
+                "name": "scope-1",
+                "version": "1.0.0",
+                "attributes": [
+                  {"key": "library.name", "value": {"stringValue": "test-lib"}}
+                ]
+              },
+              "logRecords": [
+                {
+                  "timeUnixNano": "1640995200000000000",
+                  "body": {"stringValue": "this log should not be processed"}
+                },
+                {
+                  "timeUnixNano": "1640995201000000000",
+                  "body": {"stringValue": "neither should this one"}
+                }
+              ]
+            },
+            {
+              "scope": {
+                "name": "scope-2",
+                "version": "2.0.0"
+              },
+              "logRecords": [
+                {
+                  "timeUnixNano": "1640995202000000000",
+                  "body": {"stringValue": "or this one"}
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "resource": {
+            "attributes": [
+              {"key": "service.name", "value": {"stringValue": "service-2"}}
+            ]
+          },
+          "scopeLogs": [{
+            "logRecords": [
+              {
+                "timeUnixNano": "1640995203000000000",
+                "body": {"stringValue": "this entire resource should not be reached"}
+              }
+            ]
+          }]
+        }
+      ]
+    },
+    "expected_error": {
+      "code": "FLB_OTEL_LOGS_ERR_UNEXPECTED_ATTRIBUTES_TYPE"
+    }
+  },
+
+  "mixed_valid_invalid_trace_span_ids": {
+    "input": {
+      "resourceLogs": [{
+        "scopeLogs": [{
+          "logRecords": [
+            {
+              "timeUnixNano": "1640995200000000000",
+              "traceId": "5B8EFFF798038103D269B633813FC60C",
+              "spanId": "EEE19B7EC3C1B174",
+              "body": {"stringValue": "valid trace and span IDs"}
+            },
+            {
+              "timeUnixNano": "1640995201000000000",
+              "traceId": "5B8EFFF798038103D269B633813FC60C",
+              "spanId": "EEE19B7EC3C1B174",
+              "attributes": [
+                {"key": "operation", "value": {"stringValue": "database_query"}}
+              ],
+              "body": {"stringValue": "another valid log with trace context"}
+            },
+            {
+              "timeUnixNano": "1640995202000000000",
+              "traceId": "invalid_trace_id_length",
+              "spanId": "EEE19B7EC3C1B174",
+              "body": {"stringValue": "this has invalid trace ID"}
+            }
+          ]
+        }]
+      }]
+    },
+    "expected_error": {
+      "code": "FLB_OTEL_LOGS_ERR_UNEXPECTED_TIMESTAMP_TYPE"
+    }
+  },
+
+  "partial_group_processing_body_type_failure": {
+    "input": {
+      "resourceLogs": [
+        {
+          "resource": {
+            "attributes": [
+              {"key": "service.name", "value": {"stringValue": "service-1"}},
+              {"key": "environment", "value": {"stringValue": "production"}}
+            ]
+          },
+          "scopeLogs": [{
+            "scope": {
+              "name": "instrumentation-library",
+              "version": "1.2.3"
+            },
+            "logRecords": [
+              {
+                "timeUnixNano": "1640995200000000000",
+                "severityNumber": 9,
+                "body": {"stringValue": "valid log entry"}
+              },
+              {
+                "timeUnixNano": "1640995201000000000",
+                "body": ["this", "should", "be", "a", "map", "not", "array"]
+              }
+            ]
+          }]
+        }
+      ]
+    },
+    "expected_error": {
+      "code": "FLB_OTEL_LOGS_ERR_UNEXPECTED_BODY_TYPE"
+    }
+  },
+
+  "multiple_resources_first_succeeds_second_fails_logrecords": {
+    "input": {
+      "resourceLogs": [
+        {
+          "resource": {
+            "attributes": [
+              {"key": "service.name", "value": {"stringValue": "valid-service"}}
+            ]
+          },
+          "scopeLogs": [{
+            "logRecords": [
+              {
+                "timeUnixNano": "1640995200000000000",
+                "body": {"stringValue": "valid log from first resource"}
+              }
+            ]
+          }]
+        },
+        {
+          "resource": {
+            "attributes": [
+              {"key": "service.name", "value": {"stringValue": "another-service"}}
+            ]
+          },
+          "scopeLogs": [{
+            "logRecords": "this_should_be_array_not_string"
+          }]
+        }
+      ]
+    },
+    "expected_error": {
+      "code": "FLB_OTEL_LOGS_ERR_UNEXPECTED_LOGRECORDS_TYPE"
+    }
   }
+
 }
